@@ -100,11 +100,11 @@ class GeoFeatureModelSerializer(ModelSerializer):
         fields = list(self.fields.values())
 
         # optional id attribute
-        if self.Meta.id_field:
-            field = self.fields[self.Meta.id_field]
-            value = field.get_attribute(instance)
-            feature["id"] = field.to_representation(value)
-            fields.remove(field)
+        #if self.Meta.id_field:
+        #    field = self.fields[self.Meta.id_field]
+        #    value = field.get_attribute(instance)
+        #    feature["id"] = field.to_representation(value)
+        #    fields.remove(field)
 
         # required type attribute
         # must be "Feature" according to GeoJSON spec
