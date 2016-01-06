@@ -25,6 +25,7 @@ class GeometryField(Field):
         if isinstance(value, dict) or value is None:
             return value
         # we expect value to be a GEOSGeometry instance
+        value.transform("EPSG: 4326")
         return GeoJsonDict((
             ('type', value.geom_type),
             ('coordinates', value.coords),
