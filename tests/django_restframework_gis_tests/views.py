@@ -1,5 +1,5 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics
-from rest_framework.filters import DjangoFilterBackend
 from rest_framework_gis.filters import *
 from rest_framework_gis.pagination import GeoJsonPagination
 
@@ -132,10 +132,12 @@ geojson_location_noid_details = GeojsonLocationNoIdDetails.as_view()
 
 
 class LocationFilter(GeoFilterSet):
-    contains_properly = GeometryFilter(name='geometry', lookup_type='contains_properly')
+    contains_properly = GeometryFilter(name='geometry',
+                                       lookup_expr='contains_properly')
 
     class Meta:
         model = Location
+        fields = ['contains_properly']
 
 class GeojsonLocationContainedInGeometry(generics.ListAPIView):
     queryset = Location.objects.all()

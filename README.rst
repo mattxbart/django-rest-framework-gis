@@ -1,7 +1,7 @@
 django-rest-framework-gis
 =========================
 
-|Build Status| |Coverage Status| |Requirements Status| |PyPI version| |PyPI downloads|
+|Build Status| |Coverage Status| |Requirements Status| |PyPI version|
 
 Geographic add-ons for Django Rest Framework - `Mailing
 List <http://bit.ly/1M4sLTp>`__.
@@ -39,6 +39,8 @@ Compatibility with DRF, Django and Python
 
 ===============  ============================ ==================== ==================================
 DRF-gis version  DRF version                  Django version       Python version
+**0.12.x**       **3.1** to **3.7**           **1.11** to **2.0**   **2.7** to **3.6**
+**0.11.x**       **3.1** to **3.6**           **1.7** to **1.11**  **2.7** to **3.6**
 **0.10.x**       **3.1** to **3.3**           **1.7** to **1.9**   **2.7** to **3.5**
 **0.9.6**        **3.1** to **3.2**           **1.5** to **1.8**   **2.6** to **3.5**
 **0.9.5**        **3.1** to **3.2**           **1.5** to **1.8**   **2.6** to **3.4**
@@ -303,7 +305,7 @@ read access for a REST client and can be achieved using ``auto_bbox``. Example:
             auto_bbox = True
 
 
-The second approach uses the ``bbox_geo_field`` to specify an addional
+The second approach uses the ``bbox_geo_field`` to specify an additional
 ``GeometryField`` of the model which will be used to calculate the bounding box. This allows
 boundingboxes differ from the exact extent of a features geometry. Additionally this
 enables read and write access for the REST client. Bounding boxes send from the client will
@@ -341,7 +343,7 @@ the ``properties`` member:
         Metadata is stored in a PostgreSQL HStore field, which allows us to
         store arbitrary key-value pairs with a link record.
         """
-        metadata = HStoreField(blank=True, null=True, default={})
+        metadata = HStoreField(blank=True, null=True, default=dict)
         geo = models.LineStringField()
         objects = models.GeoManager()
 
@@ -428,6 +430,8 @@ Example result response (cut to one element only instead of 10):
 Filters
 -------
 
+**note**: this feature has been tested up to django-filter 1.0.
+
 We provide a ``GeometryFilter`` field as well as a ``GeoFilterSet``
 for usage with ``django_filter``. You simply provide, in the query
 string, one of the textual types supported by ``GEOSGeometry``. By
@@ -439,10 +443,12 @@ GeometryFilter
 .. code-block:: python
 
     from rest_framework_gis.filterset import GeoFilterSet
+    from rest_framework_gis.filters import GeometryFilter
+    from django_filters import filters
 
     class RegionFilter(GeoFilterSet):
-        slug = filters.CharFilter(name='slug', lookup_type='istartswith')
-        contains_geom = filters.GeometryFilter(name='geom', lookup_type='contains')
+        slug = filters.CharFilter(name='slug', lookup_expr='istartswith')
+        contains_geom = GeometryFilter(name='geom', lookup_expr='contains')
 
         class Meta:
             model = Region
@@ -569,37 +575,68 @@ Projects using this package
 Running the tests
 -----------------
 
-Assuming one has the dependencies installed (restframework and
-restframework\_gis), and one of the `Spatial Database server supported
-by
-GeoDjango <https://docs.djangoproject.com/en/dev/ref/contrib/gis/db-api/#module-django.contrib.gis.db.backends>`__
-is up and running:
+Required setup
+==============
+
+You need one of the `Spatial Database servers supported by
+GeoDjango <https://docs.djangoproject.com/en/dev/ref/contrib/gis/db-api/#module-django.contrib.gis.db.backends>`__,
+and create a database for the tests.
+
+The following can be used with PostgreSQL:
 
 .. code-block:: bash
 
-    ./runtests.py
+  createdb django_restframework_gis
+  psql -U postgres -d django_restframework_gis -c "CREATE EXTENSION postgis"
 
 You might need to tweak the DB settings according to your DB
 configuration. You can copy the file ``local_settings.example.py`` to
 ``local_settings.py`` and change the ``DATABASES`` and/or
 ``INSTALLED_APPS`` directives there.
 
-If you want to contribute you need to install the test app in a proper
-development environment.
+This should allow you to run the tests already.
 
-These steps should do the trick:
+For reference, the following steps will setup a development environment for
+contributing to the project:
 
 -  create a spatial database named "django\_restframework\_gis"
 -  create ``local_settings.py``, eg:
    ``cp local_settings.example.py local_settings.py``
 -  tweak the ``DATABASES`` configuration directive according to your DB
    settings
--  optionally install ``olwidget`` with ``pip install olwidget``
--  uncomment ``INSTALLED_APPS`` (remove olwidget if you did not install
-   it)
+-  uncomment ``INSTALLED_APPS``
 -  run ``python manage.py syncdb``
 -  run ``python manage.py collectstatic``
 -  run ``python manage.py runserver``
+
+Using tox
+=========
+
+The recommended way to run the tests is by using
+`tox <https://tox.readthedocs.io/en/latest/>`__, which can be installed using
+`pip install tox`.
+
+You can use ``tox -l`` to list the available environments, and then e.g. use
+the following to run all tests with Python 3.6 and Django 1.11:
+
+.. code-block:: bash
+
+    tox -e py36-django111
+
+By default Django's test runner is used, but there is a variation of tox's
+envlist to use pytest (using the ``-pytest`` suffix).
+
+You can pass optional arguments to the test runner like this:
+
+.. code-block:: bash
+
+    tox -e py36-django111-pytest -- -k test_foo
+
+Running tests manually
+======================
+
+Please refer to the ``tox.ini`` file for reference/help in case you want to run
+tests manually / without tox.
 
 Contributing
 ------------
@@ -625,5 +662,3 @@ Contributing
    :target: https://requires.io/github/djangonauts/django-rest-framework-gis/requirements/?branch=master
 .. |PyPI version| image:: https://badge.fury.io/py/djangorestframework-gis.svg
    :target: http://badge.fury.io/py/djangorestframework-gis
-.. |PyPI downloads| image:: https://img.shields.io/pypi/dm/djangorestframework-gis.svg
-    :target: http://badge.fury.io/py/djangorestframework-gis

@@ -18,13 +18,18 @@ except ImportError:  # pragma: no cover
         'restframework-gis filters depend on package "django-filter" '
         'which is missing. Install with "pip install django-filter".'
     )
-
-try:  # pragma: no cover
-    # django >= 1.8
-    from django.contrib.gis.db.models.lookups import gis_lookups
-except ImportError:  # pragma: no cover
-    # django <= 1.7
-    gis_lookups = models.sql.query.ALL_TERMS
+try:
+    # Django >= 2.0
+    from django.contrib.gis.db.models.fields import BaseSpatialField
+except ImportError:
+    try:  # pragma: no cover
+        # django >= 1.8,<2.0
+        from django.contrib.gis.db.models.lookups import gis_lookups
+    except ImportError:  # pragma: no cover
+        # django <= 1.7
+        gis_lookups = models.sql.query.ALL_TERMS
+else:
+    gis_lookups = BaseSpatialField.get_lookups()
 
 
 __all__ = [
@@ -75,6 +80,10 @@ InBBOXFilter = InBBoxFilter
 class GeometryFilter(django_filters.Filter):
     field_class = forms.GeometryField
 
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('widget', forms.TextInput)
+        super(GeometryFilter, self).__init__(*args, **kwargs)
+
 
 class GeoFilterSet(django_filters.FilterSet):
     GEOFILTER_FOR_DBFIELD_DEFAULTS = {
@@ -84,7 +93,11 @@ class GeoFilterSet(django_filters.FilterSet):
     }
 
     def __new__(cls, *args, **kwargs):
-        cls.filter_overrides.update(cls.GEOFILTER_FOR_DBFIELD_DEFAULTS)
+        try:
+            cls._meta.filter_overrides.update(cls.GEOFILTER_FOR_DBFIELD_DEFAULTS)
+        # maintain compatibility for django-filter < 0.15
+        except AttributeError:  # pragma: nocover
+            cls.filter_overrides.update(cls.GEOFILTER_FOR_DBFIELD_DEFAULTS)
         cls.LOOKUP_TYPES = sorted(gis_lookups)
         return super(GeoFilterSet, cls).__new__(cls)
 

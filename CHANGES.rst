@@ -1,6 +1,37 @@
 Changelog
 =========
 
+Version 0.12.0 [2017-11-12]
+---------------------------
+
+- `#138 <https://github.com/djangonauts/django-rest-framework-gis/pull/138>`_:
+  added support for ``GeometryCollection`` fields
+- `#146 <https://github.com/djangonauts/django-rest-framework-gis/pull/146>`_:
+  added compatibility with django-rest-framework 3.7
+- `#147 <https://github.com/djangonauts/django-rest-framework-gis/pull/147>`_:
+  added support to django 2.0 beta
+- dropped support for django 1.7, 1.8, 1.9 and 1.10
+
+Version 0.11.2 [2017-05-22]
+---------------------------
+
+- `eb54fc0 <https://github.com/djangonauts/django-rest-framework-gis/commit/eb54fc0>`_: ``GeometryFilter`` now use ``BaseGeometryWidget``
+- `33a6418 <https://github.com/djangonauts/django-rest-framework-gis/commit/33a6418>`_: fixed tests for Django 1.11: ``Point`` comparison uses ``srid``
+
+Version 0.11.1 [2017-05-05]
+---------------------------
+
+- `#119 <https://github.com/djangonauts/django-rest-framework-gis/issues/119>`_: Added support to "__all__" fields in serializer
+- `#130 <https://github.com/djangonauts/django-rest-framework-gis/pull/130>`_: Added compatibility with DRF 3.6
+
+Version 0.11.0 [2016-11-22]
+---------------------------
+
+- `#106 <https://github.com/djangonauts/django-rest-framework-gis/pull/106>`_: dropped support for django 1.7
+- `#117 <https://github.com/djangonauts/django-rest-framework-gis/pull/117>`_: added support for django-filter 0.15
+- `6479949 <https://github.com/djangonauts/django-rest-framework-gis/commit/6479949>`_: fixed tests for latest DRF 3.5 version
+- `35e3b87 <https://github.com/djangonauts/django-rest-framework-gis/commit/35e3b87>`_: added official support to django 1.10
+
 Version 0.10.1 [2016-01-06]
 ---------------------------
 

@@ -2,16 +2,22 @@
 unit tests for restframework_gis
 """
 
+import django
 import urllib
 import sys
 import json
+import pickle
 
 from django.test import TestCase
 from django.contrib.gis.geos import GEOSGeometry, Polygon, Point
-from django.core.urlresolvers import reverse
+try:
+    from django.urls import reverse
+except ImportError:
+    from django.core.urlresolvers import reverse
 from django.core.exceptions import ImproperlyConfigured
 
 from rest_framework_gis import serializers as gis_serializers
+from rest_framework_gis.fields import GeoJsonDict
 
 from .models import Location, LocatedFile
 from .serializers import LocationGeoSerializer
@@ -22,6 +28,12 @@ class TestRestFrameworkGis(TestCase):
         self.location_list_url = reverse('api_location_list')
         self.geojson_location_list_url = reverse('api_geojson_location_list')
         self.geos_error_message = 'Invalid format: string or unicode input unrecognized as GeoJSON, WKT EWKT or HEXEWKB.'
+        self.gdal_error_message = 'Unable to convert to python object: Invalid geometry pointer returned from "OGR_G_CreateGeometryFromJson".'
+        if django.VERSION[0] == 2:
+            self.value_error_message = "Unable to convert to python object: String input unrecognized as WKT EWKT, and HEXEWKB."
+        else:
+            self.value_error_message = "Unable to convert to python object: String or unicode input unrecognized as WKT EWKT, and HEXEWKB."
+        self.type_error_message = "Unable to convert to python object: Improper geometry input type:"
 
     def _create_locations(self):
         self.l1 = Location.objects.create(id=1, name='l1', slug='l1', geometry='POINT (13.0078125000020002 42.4234565179379999)')
@@ -167,10 +179,10 @@ class TestRestFrameworkGis(TestCase):
         response = self.client.post(self.location_list_url, data=json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Location.objects.count(), 0)
-        self.assertEqual(response.data['geometry'][0], self.geos_error_message)
+        self.assertEqual(response.data['geometry'][0], self.value_error_message)
         # repeat as multipart form data
         response = self.client.post(self.location_list_url, data)
-        self.assertEqual(response.data['geometry'][0], self.geos_error_message)
+        self.assertEqual(response.data['geometry'][0], self.value_error_message)
         data = {
             'name': 'I AM MODERATELY WRONG',
             'geometry': 'POINT (12.492324113849, 41.890307434153)'
@@ -195,25 +207,25 @@ class TestRestFrameworkGis(TestCase):
             }
         }
         response = self.client.post(self.location_list_url, data=json.dumps(data), content_type='application/json')
-        self.assertEqual(response.data['geometry'][0], self.geos_error_message)
+        self.assertEqual(response.data['geometry'][0], self.gdal_error_message)
         data = {
             "name": "very wrong",
             "geometry": ['a', 'b', 'c']
         }
         response = self.client.post(self.location_list_url, data=json.dumps(data), content_type='application/json')
-        self.assertEqual(response.data['geometry'][0], self.geos_error_message)
+        self.assertEqual(response.data['geometry'][0][0:65], self.type_error_message)
         data = {
             "name": "very wrong",
             "geometry": False
         }
         response = self.client.post(self.location_list_url, data=json.dumps(data), content_type='application/json')
-        self.assertEqual(response.data['geometry'][0], self.geos_error_message)
+        self.assertEqual(response.data['geometry'][0][0:65], self.type_error_message)
         data = {
             "name": "very wrong",
             "geometry": { "value": { "nested": ["yo"] } }
         }
         response = self.client.post(self.location_list_url, data=json.dumps(data), content_type='application/json')
-        self.assertEqual(response.data['geometry'][0], self.geos_error_message)
+        self.assertEqual(response.data['geometry'][0], self.gdal_error_message)
 
     def test_geojson_format(self):
         """ test geojson format """
@@ -362,7 +374,7 @@ class TestRestFrameworkGis(TestCase):
         response = self.client.post(self.geojson_location_list_url, data=json.dumps(data), content_type='application/json')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Location.objects.count(), 0)
-        self.assertEqual(response.data['geometry'][0], self.geos_error_message)
+        self.assertEqual(response.data['geometry'][0], self.gdal_error_message)
 
     def test_post_geojson_location_list_WKT(self):
         self.assertEqual(Location.objects.count(), 0)
@@ -485,7 +497,8 @@ class TestRestFrameworkGis(TestCase):
         self.assertEqual(response.status_code, 200)
         location_reloaded = Location.objects.get(pk=location.id)
         self.assertEquals(location_reloaded.name, 'geojson successful patch test')
-        self.assertEquals(location_reloaded.geometry, Point(10.1, 10.1))
+        self.assertEquals(location_reloaded.geometry,
+                          Point(10.1, 10.1, srid=location.geometry.srid))
 
     def test_patch_geojson_location_wo_changing_geometry(self):
         location = Location.objects.create(name='geojson patch test', geometry='POINT (135.0 45.0)')
@@ -499,13 +512,15 @@ class TestRestFrameworkGis(TestCase):
         self.assertEqual(response.status_code, 200)
         location_reloaded = Location.objects.get(pk=location.id)
         self.assertEquals(location_reloaded.name, 'geojson successful patch test')
-        self.assertEquals(location_reloaded.geometry, Point(135.0, 45.0))
+        self.assertEquals(location_reloaded.geometry,
+                          Point(135.0, 45.0, srid=location.geometry.srid))
 
     def test_geometry_serializer_method_field(self):
         location = Location.objects.create(name='geometry serializer method test', geometry='POINT (135.0 45.0)')
         location_loaded = Location.objects.get(pk=location.id)
         self.assertEqual(location_loaded.name, 'geometry serializer method test')
-        self.assertEqual(location_loaded.geometry, Point(135.0, 45.0))
+        self.assertEqual(location_loaded.geometry,
+                         Point(135.0, 45.0, srid=location.geometry.srid))
         url = reverse('api_geojson_location_details_hidden', args=[location.id])
         data = {
             "properties": {
@@ -516,12 +531,13 @@ class TestRestFrameworkGis(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['properties']['name'], 'hidden geometry')
         self.assertEqual(response.data['geometry']['type'], 'Point')
-        self.assertEqual(response.data['geometry']['coordinates'], (0.0, 0.0))
+        self.assertEqual(response.data['geometry']['coordinates'], [0.0, 0.0])
 
     def test_geometry_serializer_method_field_none(self):
         location = Location.objects.create(name='None value', geometry='POINT (135.0 45.0)')
         location_loaded = Location.objects.get(pk=location.id)
-        self.assertEqual(location_loaded.geometry, Point(135.0, 45.0))
+        self.assertEqual(location_loaded.geometry,
+                         Point(135.0, 45.0, srid=location.geometry.srid))
         url = reverse('api_geojson_location_details_none', args=[location.id])
         response = self.client.generic('GET', url, content_type='application/json')
         self.assertEqual(response.status_code, 200)
@@ -570,8 +586,6 @@ class TestRestFrameworkGis(TestCase):
         self.assertIn('previous', response.data)
 
     def test_pickle(self):
-        import pickle
-        from rest_framework_gis.fields import GeoJsonDict
         geometry = GEOSGeometry('POINT (30 10)')
         geojsondict = GeoJsonDict((
             ('type', geometry.geom_type),
@@ -580,3 +594,57 @@ class TestRestFrameworkGis(TestCase):
         pickled = pickle.dumps(geojsondict)
         restored = pickle.loads(pickled)
         self.assertEqual(restored, geojsondict)
+
+    def test_geometrycollection_geojson(self):
+        """ test geometry collection geojson behaviour """
+        location = Location.objects.create(name='geometry collection geojson test',
+                                           geometry='GEOMETRYCOLLECTION ('
+                                                    'POINT (135.0 45.0),'
+                                                    'LINESTRING (135.0 45.0,140.0 50.0,145.0 55.0),'
+                                                    'POLYGON ((135.0 45.0,140.0 50.0,145.0 55.0,135.0 45.0)))')
+        url = reverse('api_geojson_location_details', args=[location.id])
+        expected = {
+            'id': location.id,
+            'type': 'Feature',
+            'properties': {
+                'details': "http://testserver/geojson/%s/" % location.id,
+                'name': 'geometry collection geojson test',
+                'fancy_name': 'Kool geometry collection geojson test',
+                'timestamp': None,
+                'slug': 'geometry-collection-geojson-test',
+            },
+            'geometry': {
+                'type': 'GeometryCollection',
+                'geometries': [
+                    {
+                        'type': 'Point',
+                        'coordinates': [135.0, 45.0]
+                    },
+                    {
+                        'type': 'LineString',
+                        'coordinates': [
+                            [135.0, 45.0],
+                            [140.0, 50.0],
+                            [145.0, 55.0]
+                        ]
+                    },
+                    {
+                        'type': 'Polygon',
+                        'coordinates': [
+                            [
+                                [135.0, 45.0],
+                                [140.0, 50.0],
+                                [145.0, 55.0],
+                                [135.0, 45.0],
+                            ]
+                        ]
+                    },
+                ],
+            }
+        }
+        response = self.client.get(url)
+        if sys.version_info > (3, 0, 0):
+            self.assertCountEqual(json.dumps(response.data), json.dumps(expected))
+        else:
+            self.assertItemsEqual(json.dumps(response.data), json.dumps(expected))
+        self.assertContains(response, "Kool geometry collection geojson test")

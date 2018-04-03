@@ -1,1 +1,2 @@
-djangorestframework>=3.3
+six
+djangorestframework>=3.3,<3.8
